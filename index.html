@@ -541,12 +541,15 @@ function helloWorld() {
                     const selectStart = start + `\`\`\`${lang}\n`.length;
                     const selectEnd = selectStart + (selectedText || placeholder).length;
                     markdownInput.setSelectionRange(selectStart, selectEnd);
-                } else if (tag === 'text') {
+                } else if (tag === '[text](url)') {
                     const linkText = selectedText || 'link text';
-                    const textToInsert = `${linkText}`;
+                    const url = 'https://';
+                    const textToInsert = `[${linkText}](${url})`;
                     markdownInput.setRangeText(textToInsert, start, end);
-                    // Intelligently select 'url' for easy replacement by the user
-                    const urlStart = start + `${linkText};
+                    // Select the url part for easy replacement
+                    const urlStart = start + `[${linkText}](`.length;
+                    const urlEnd = urlStart + url.length;
+                    markdownInput.setSelectionRange(urlStart, urlEnd);
                 }
 
                 markdownInput.focus();
