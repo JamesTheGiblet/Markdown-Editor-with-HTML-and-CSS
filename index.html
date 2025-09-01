@@ -365,6 +365,19 @@
             transform: translateY(-3px);
         }
 
+        .btn-danger {
+            background: transparent;
+            color: #ff5555;
+            border: 2px solid rgba(255, 85, 85, 0.5);
+        }
+
+        .btn-danger:hover {
+            border-color: #ff5555;
+            color: white;
+            background: rgba(255, 85, 85, 0.2);
+            transform: translateY(-3px);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .nav-links {
@@ -439,3 +452,168 @@ Here's some **bold** and *italic* text.
 function helloWorld() {
     console.log('Hello, Markdown Editor!');
 }
+```</textarea>
+        </div>
+        <!-- Preview Panel -->
+        <div class="preview-panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Preview</h3>
+            </div>
+            <div id="markdown-preview"></div>
+        </div>
+    </section>
+
+    <!-- Action Buttons -->
+    <div class="container">
+        <div class="action-buttons">
+            <button id="copy-btn" class="btn btn-secondary">Copy Markdown</button>
+            <button id="clear-btn" class="btn btn-danger">Clear Editor</button>
+            <button id="download-btn" class="btn btn-primary">Download as HTML</button>
+        </div>
+    </div>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const markdownInput = document.getElementById('markdown-input');
+            const markdownPreview = document.getElementById('markdown-preview');
+            const toolBtns = document.querySelectorAll('.tool-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const clearBtn = document.getElementById('clear-btn');
+            const canvas = document.getElementById('bg-canvas');
+
+            // --- Marked.js Configuration for Syntax Highlighting ---
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return hljs.highlight(code, { language }).value;
+                },
+                langPrefix: 'hljs language-', // for CSS classes
+                breaks: true, // render <br> on single line breaks
+            });
+
+            // --- Core Functions ---
+            function updatePreview() {
+                const rawMarkdown = markdownInput.value;
+                const dirtyHtml = marked.parse(rawMarkdown);
+                const cleanHtml = DOMPurify.sanitize(dirtyHtml);
+                markdownPreview.innerHTML = cleanHtml;
+                localStorage.setItem('markdownContent', rawMarkdown);
+                // Re-run highlighter on the preview pane
+                document.querySelectorAll('#markdown-preview pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+
+            function applyMarkdown(tag, sample) {
+                const start = markdownInput.selectionStart;
+                const end = markdownInput.selectionEnd;
+                const selectedText = markdownInput.value.substring(start, end);
+
+                if (['# ', '## ', '> ', '- '].includes(tag)) {
+                    const textBeforeCursor = markdownInput.value.substring(0, start);
+                    const lineStart = textBeforeCursor.lastIndexOf('\n') + 1;
+                    markdownInput.setRangeText(tag, lineStart, lineStart);
+                    markdownInput.setSelectionRange(start + tag.length, end + tag.length);
+                } else if (['**', '*'].includes(tag)) {
+                    const suffix = tag;
+                    if (!selectedText) {
+                        markdownInput.setRangeText(`${tag}${sample}${suffix}`, start, end);
+                        markdownInput.setSelectionRange(start + tag.length, start + tag.length + sample.length);
+                    } else {
+                        markdownInput.setRangeText(`${tag}${selectedText}${suffix}`, start, end);
+                        markdownInput.setSelectionRange(end + tag.length + suffix.length, end + tag.length + suffix.length);
+                    }
+                } else if (tag === '```\ncode\n```') {
+                    const lang = 'javascript';
+                    const placeholder = 'console.log("Hello, world!");';
+                    const textToInsert = `\`\`\`${lang}\n${selectedText || placeholder}\n\`\`\``;
+                    markdownInput.setRangeText(textToInsert, start, end);
+                    const selectStart = start + `\`\`\`${lang}\n`.length;
+                    const selectEnd = selectStart + (selectedText || placeholder).length;
+                    markdownInput.setSelectionRange(selectStart, selectEnd);
+                } else if (tag === 'text') {
+                    const linkText = selectedText || 'link text';
+                    const textToInsert = `${linkText}`;
+                    markdownInput.setRangeText(textToInsert, start, end);
+                    // Intelligently select 'url' for easy replacement by the user
+                    const urlStart = start + `${linkText};
+                }
+
+                markdownInput.focus();
+                updatePreview();
+            }
+
+            // --- Initial Setup ---
+            const savedMarkdown = localStorage.getItem('markdownContent');
+            if (savedMarkdown) {
+                markdownInput.value = savedMarkdown;
+            }
+            updatePreview();
+
+            // --- Event Listeners ---
+            markdownInput.addEventListener('input', updatePreview);
+            toolBtns.forEach(btn => btn.addEventListener('click', () => applyMarkdown(btn.dataset.tag, btn.dataset.sample)));
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(markdownInput.value).then(() => {
+                    const originalText = copyBtn.innerText;
+                    copyBtn.innerText = 'Copied!';
+                    setTimeout(() => { copyBtn.innerText = originalText; }, 2000);
+                }).catch(err => console.error('Failed to copy text: ', err));
+            });
+            downloadBtn.addEventListener('click', () => {
+                const htmlContent = markdownPreview.innerHTML;
+                const fullHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Markdown Export</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"><style>body{font-family:sans-serif;line-height:1.6;padding:2rem;max-width:800px;margin:auto;}pre{border-radius:5px;}img{max-width:100%;}</style></head><body>${htmlContent}</body></html>`;
+                const blob = new Blob([fullHtml], { type: 'text/html' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'markdown-export.html';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            });
+
+            clearBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear the editor? This action cannot be undone.')) {
+                    markdownInput.value = '';
+                    updatePreview(); // This also clears localStorage and the preview pane
+                }
+            });
+
+            // --- Animated Background ---
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                let width = canvas.width = window.innerWidth;
+                let height = canvas.height = window.innerHeight;
+                let particles = [];
+                window.addEventListener('resize', () => {
+                    width = canvas.width = window.innerWidth;
+                    height = canvas.height = window.innerHeight;
+                    createParticles();
+                });
+                class Particle {
+                    constructor() { this.x = Math.random() * width; this.y = Math.random() * height; this.vx = -1 + Math.random() * 2; this.vy = -1 + Math.random() * 2; this.radius = Math.random() * 2; }
+                    update() { this.x += this.vx; this.y += this.vy; if (this.x < 0 || this.x > width) this.vx *= -1; if (this.y < 0 || this.y > height) this.vy *= -1; }
+                    draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; ctx.fill(); }
+                }
+                function createParticles() {
+                    particles = [];
+                    const particleCount = Math.floor(width * height / 15000);
+                    for (let i = 0; i < particleCount; i++) { particles.push(new Particle()); }
+                }
+                function animate() { ctx.clearRect(0, 0, width, height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animate); }
+                createParticles();
+                animate();
+            }
+        });
+    </script>
+</body>
+</html>
